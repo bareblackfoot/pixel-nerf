@@ -220,7 +220,7 @@ class GibsonDataset(torch.utils.data.Dataset):
                 c *= scale
             elif mask_path is not None:
                 all_bboxes *= scale
-
+            all_bboxes = all_bboxes.clamp(0, self.image_size - 1)
             all_imgs = F.interpolate(all_imgs, size=self.image_size, mode="area")
             if all_masks is not None:
                 all_masks = F.interpolate(all_masks, size=self.image_size, mode="area")

@@ -217,7 +217,7 @@ def masked_sample(masks, num_pix, prop_inside, thresh=0.5):
     return pix
 
 
-def bbox_sample(bboxes, num_pix):
+def bbox_sample(bboxes, num_pix, image_size=64):
     """
     :return (num_pix, 3)
     """
