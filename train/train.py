@@ -45,6 +45,11 @@ def extra_args(parser):
         help="Step to stop using bbox sampling",
     )
     parser.add_argument(
+        "--image_size",
+        type=int,
+        default=64,
+    )
+    parser.add_argument(
         "--fixed_test",
         action="store_true",
         default=None,
@@ -56,7 +61,7 @@ def extra_args(parser):
 args, conf = util.args.parse_args(extra_args, training=True, default_ray_batch_size=128)
 device = util.get_cuda(args.gpu_id[0])
 
-dset, val_dset, _ = get_split_dataset(args.dataset_format, args.datadir)
+dset, val_dset, _ = get_split_dataset(args.dataset_format, args.datadir, args.image_size)
 print(
     "dset z_near {}, z_far {}, lindisp {}".format(dset.z_near, dset.z_far, dset.lindisp)
 )

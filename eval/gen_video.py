@@ -228,9 +228,9 @@ if args.split == "test":
 elif args.split == "val":
     vid_name = "v" + vid_name
 vid_name += "_v" + "_".join(map(lambda x: "{:03}".format(x), source))
-vid_path = os.path.join(args.visual_path, args.name, "video" + vid_name + ".mp4")
+vid_path = os.path.join(args.project_dir, args.visual_path, args.name, "video" + vid_name + ".mp4")
 viewimg_path = os.path.join(
-    args.visual_path, args.name, "video" + vid_name + "_view.jpg"
+    args.project_dir, args.visual_path, args.name, "video" + vid_name + "_view.jpg"
 )
 imageio.mimwrite(
     vid_path, (frames.cpu().numpy() * 255).astype(np.uint8), fps=args.fps, quality=8

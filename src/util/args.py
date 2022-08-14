@@ -57,6 +57,12 @@ def parse_args(
         help="visualization output directory",
     )
     parser.add_argument(
+        "--project-dir",
+        type=str,
+        default="/home/blackfoot/codes/pixel-nerfD",
+        help="visualization output directory",
+    )
+    parser.add_argument(
         "--epochs",
         type=int,
         default=default_num_epochs,
@@ -75,6 +81,10 @@ def parse_args(
     if callback is not None:
         parser = callback(parser)
     args = parser.parse_args()
+    args.checkpoints_path = os.path.join(args.project_dir, args.checkpoints_path)
+    args.logs_path = os.path.join(args.project_dir, args.logs_path)
+    args.visual_path = os.path.join(args.project_dir, args.visual_path)
+
 
     if args.exp_group_name is not None:
         args.logs_path = os.path.join(args.logs_path, args.exp_group_name)

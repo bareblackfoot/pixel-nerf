@@ -5,7 +5,7 @@ import glob
 import imageio
 import numpy as np
 from util import get_image_to_tensor_balanced, get_mask_to_tensor
-
+from scipy.spatial.transform import Rotation as R
 
 class SRNDataset(torch.utils.data.Dataset):
     """
@@ -70,6 +70,13 @@ class SRNDataset(torch.utils.data.Dataset):
             lines = intrinfile.readlines()
             focal, cx, cy, _ = map(float, lines[0].split())
             height, width = map(int, lines[-1].split())
+        for rgb_path, pose_path in zip(rgb_paths, pose_paths):
+            pose = torch.from_numpy(
+                np.loadtxt(pose_path, dtype=np.float32).reshape(4, 4)
+            )
+            r = R.from_matrix(pose[:3, :3])
+            aa = r.as_euler('xyz', degrees=True)
+            print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
 
         all_imgs = []
         all_poses = []

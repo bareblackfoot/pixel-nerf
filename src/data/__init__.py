@@ -3,11 +3,11 @@ import os
 from .MultiObjectDataset import MultiObjectDataset
 from .DVRDataset import DVRDataset
 from .SRNDataset import SRNDataset
-
+from .GibsonDataset import GibsonDataset
 from .data_util import ColorJitterDataset
 
 
-def get_split_dataset(dataset_type, datadir, want_split="all", training=True, **kwargs):
+def get_split_dataset(dataset_type, datadir, image_size, want_split="all", training=True, **kwargs):
     """
     Retrieved desired dataset class
     :param dataset_type dataset type name (srn|dvr|dvr_gen, etc)
@@ -22,6 +22,10 @@ def get_split_dataset(dataset_type, datadir, want_split="all", training=True, **
     if dataset_type == "srn":
         # For ShapeNet single-category (from SRN)
         dset_class = SRNDataset
+    elif dataset_type == "gibson":
+        # For ShapeNet single-category (from SRN)
+        dset_class = GibsonDataset
+        flags["image_size"] = image_size
     elif dataset_type == "multi_obj":
         # For multiple-object
         dset_class = MultiObjectDataset
@@ -59,7 +63,7 @@ def get_split_dataset(dataset_type, datadir, want_split="all", training=True, **
         val_set = dset_class(datadir, stage="val", **flags, **kwargs)
 
     if want_test:
-        test_set = dset_class(datadir, stage="test", **flags, **kwargs)
+        test_set = dset_class(datadir, stage="val", **flags, **kwargs)
 
     if want_split == "train":
         return train_set
