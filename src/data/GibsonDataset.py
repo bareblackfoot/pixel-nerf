@@ -47,17 +47,7 @@ class GibsonDataset(torch.utils.data.Dataset):
 
         file_lists = np.concatenate([glob.glob(x+"/*") for x in cats])
 
-        # all_objs = []
-        # for file_list in file_lists:
-        #     if not os.path.exists(file_list):
-        #         continue
-        #     base_dir = os.path.dirname(file_list)
-        #     cat = os.path.basename(base_dir)
-        #     with open(file_list, "r") as f:
-        #         objs = [(cat, os.path.join(base_dir, x.strip())) for x in f.readlines()]
-        #     all_objs.extend(objs)
-
-        self.all_objs = file_lists
+        self.file_lists = file_lists
         self.stage = stage
 
         # self.image_to_tensor = get_image_to_tensor_balanced(image_size=image_size)
@@ -68,7 +58,7 @@ class GibsonDataset(torch.utils.data.Dataset):
             self.base_path,
             "stage",
             stage,
-            len(self.all_objs),
+            len(self.file_lists),
             "objs",
             "type:",
             sub_format,
@@ -93,19 +83,23 @@ class GibsonDataset(torch.utils.data.Dataset):
                 [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]],
                 dtype=torch.float32,
             )
+            self.coord_cam = np.array( [[1, 0, 0], [0, 0, 1], [0, -1, 0]])
         self.sub_format = sub_format
         self.scale_focal = scale_focal
         self.max_imgs = max_imgs
+        self._coord_trans = torch.diag(
+            torch.tensor([1, -1, -1, 1], dtype=torch.float32)
+        )
 
         self.z_near = z_near
         self.z_far = z_far
         self.lindisp = False
 
     def __len__(self):
-        return len(self.all_objs)
+        return len(self.file_lists)
 
     def __getitem__(self, index):
-        root_dir = self.all_objs[index]
+        root_dir = self.file_lists[index]
 
         rgb_paths = [
             x
@@ -113,7 +107,7 @@ class GibsonDataset(torch.utils.data.Dataset):
             if (x.endswith(".jpg") or x.endswith(".png"))
         ]
         rgb_paths = sorted(rgb_paths)
-        mask_paths = sorted(glob.glob(os.path.join(root_dir, "mask", "*.png")))
+        mask_paths = []#sorted(glob.glob(os.path.join(root_dir, "mask", "*.png")))
         if len(mask_paths) == 0:
             mask_paths = [None] * len(rgb_paths)
 
@@ -128,8 +122,6 @@ class GibsonDataset(torch.utils.data.Dataset):
         cam_paths = sorted(glob.glob(os.path.join(root_dir, "pose", "*.pkl")))
         for cam_path in cam_paths:
             all_cam.append(joblib.load(cam_path))
-        # cam_path = os.path.join(root_dir, "cameras.npz")
-        # all_cam = np.load(cam_path)
 
         all_imgs = []
         all_poses = []
@@ -155,26 +147,36 @@ class GibsonDataset(torch.utils.data.Dataset):
                 mask = mask[..., :1]
             # Decompose projection matrix
             P = all_cam[i]
-            P = P[:3]
+            P = np.matmul(self.coord_cam, P)
+            # R = P[:3, :3]
+            # P[:3, :3] = np.matmul(self.coord_cam, R)
+            # t = P[:3, 3]
+            # P[:3, 3] = np.matmul(self.coord_cam, t)
+            K = np.eye(3, dtype=np.float32)
 
             K, R, t = cv2.decomposeProjectionMatrix(P)[:3]
+            # K = np.eye(3, dtype=np.float32)
             K = K / K[2, 2]
 
             pose = np.eye(4, dtype=np.float32)
             pose[:3, :3] = R.transpose()
+            # pose[:3, 3] = t #(t)[:, 0]
             pose[:3, 3] = (t[:3] / t[3])[:, 0]
+            # pose[3, 3] *= 1.0
             fx = torch.tensor(K[0, 0]) * x_scale
             fy = torch.tensor(K[1, 1]) * y_scale
             cx = (torch.tensor(K[0, 2]) + xy_delta) * x_scale
             cy = (torch.tensor(K[1, 2]) + xy_delta) * y_scale
             focal = torch.tensor((fx, fy), dtype=torch.float32)
 
-            pose = (
-                self._coord_trans_world
-                @ torch.tensor(pose, dtype=torch.float32)
-                @ self._coord_trans_cam
-            )
-            img_tensor = self.image_to_tensor(Image.fromarray(img))
+            # pose = torch.tensor(pose, dtype=torch.float32) @ self._coord_trans
+            # pose = (
+            #     self._coord_trans_world
+            #     @ torch.tensor(pose, dtype=torch.float32)
+            #     @ self._coord_trans_cam
+            # )
+            pose = torch.tensor(pose, dtype=torch.float32)
+            img_tensor = self.image_to_tensor(img)
             if mask_path is not None:
                 mask_tensor = self.mask_to_tensor(mask)
 
@@ -195,15 +197,7 @@ class GibsonDataset(torch.utils.data.Dataset):
             all_imgs.append(img_tensor)
             all_poses.append(pose)
 
-        if self.sub_format != "shapenet":
-            fx /= len(rgb_paths)
-            fy /= len(rgb_paths)
-            cx /= len(rgb_paths)
-            cy /= len(rgb_paths)
-            focal = torch.tensor((fx, fy), dtype=torch.float32)
-            c = torch.tensor((cx, cy), dtype=torch.float32)
-            all_bboxes = None
-        elif mask_path is not None:
+        if mask_path is not None:
             all_bboxes = torch.stack(all_bboxes)
 
         all_imgs = torch.stack(all_imgs)
@@ -216,11 +210,9 @@ class GibsonDataset(torch.utils.data.Dataset):
         if self.image_size is not None and all_imgs.shape[-2:] != self.image_size:
             scale = self.image_size / all_imgs.shape[-2]
             focal *= scale
-            if self.sub_format != "shapenet":
-                c *= scale
-            elif mask_path is not None:
+            if mask_path is not None:
                 all_bboxes *= scale
-            all_bboxes = all_bboxes.clamp(0, self.image_size - 1)
+                all_bboxes = all_bboxes.clamp(0, self.image_size - 1)
             all_imgs = F.interpolate(all_imgs, size=self.image_size, mode="area")
             if all_masks is not None:
                 all_masks = F.interpolate(all_masks, size=self.image_size, mode="area")
@@ -234,8 +226,5 @@ class GibsonDataset(torch.utils.data.Dataset):
         }
         if all_masks is not None:
             result["masks"] = all_masks
-        if self.sub_format != "shapenet":
-            result["c"] = c
-        else:
             result["bbox"] = all_bboxes
         return result
