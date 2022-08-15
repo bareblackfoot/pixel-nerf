@@ -220,7 +220,7 @@ class GibsonDataset(torch.utils.data.Dataset):
             # theta_x = abs(np.arctan2(-all_cam[i][:3, 3][1], np.sqrt(np.sum(np.square(all_cam[i][:3, [0, 2]]))))
             # q1 = qn.array.from_spherical_coordinates([theta-theta_x, phi])
             # pose[:3, :3] = q1.to_rotation_matrix
-            pose[:3, 1] = 0.88
+            pose[1,3] += 0.88
             if pose.shape[0] == 3:
                 pose = np.vstack((pose, np.array([0, 0, 0, 1])))
             # P = np.matmul(self.coord_cam, P)
