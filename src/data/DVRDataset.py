@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 from util import get_image_to_tensor_balanced, get_mask_to_tensor
 from scipy.spatial.transform import Rotation as Rot
+import matplotlib.pyplot as plt
 
 
 class DVRDataset(torch.utils.data.Dataset):
@@ -240,9 +241,9 @@ class DVRDataset(torch.utils.data.Dataset):
                 @ self._coord_trans_cam
             )
 
-            r = Rot.from_matrix(pose[:3, :3])
-            aa = r.as_euler('xyz', degrees=True)
-            print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
+            # r = Rot.from_matrix(pose[:3, :3])
+            # aa = r.as_euler('xyz', degrees=True)
+            # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
 
             img_tensor = self.image_to_tensor(img)
             if mask_path is not None:
@@ -276,6 +277,30 @@ class DVRDataset(torch.utils.data.Dataset):
         elif mask_path is not None:
             all_bboxes = torch.stack(all_bboxes)
 
+        poses = torch.stack(all_poses).cpu().detach().numpy()
+        dirs = np.stack([np.sum([0, 0, -1] * pose[:3, :3], axis=-1) for pose in poses])
+        poses[:, 2, -1]  = (poses[:, 2, -1]-min(poses[:, 2, -1]))/(max(poses[:, 2, -1])-min(poses[:, 2, -1]))*3
+        origins = poses[:, :3, -1]
+
+        # ax = plt.figure(figsize=(12, 8)).add_subplot(projection='3d')
+        # _ = ax.quiver(
+        #     origins[..., 0].flatten(),
+        #     origins[..., 1].flatten(),
+        #     origins[..., 2].flatten(),
+        #     dirs[..., 0].flatten(),
+        #     dirs[..., 1].flatten(),
+        #     dirs[..., 2].flatten(), length=0.5, normalize=True)
+        # plt.show()
+        #
+        # ax = plt.figure(figsize=(12, 12)).add_subplot()
+        # _ = ax.quiver(
+        #   origins[..., 0].flatten(),
+        #   origins[..., 1].flatten(),
+        #   dirs[..., 0].flatten(),
+        #   dirs[..., 1].flatten(),
+        # )
+        # plt.show()
+        
         all_imgs = torch.stack(all_imgs)
         all_poses = torch.stack(all_poses)
         if len(all_masks) > 0:
