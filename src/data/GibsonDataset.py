@@ -11,6 +11,27 @@ import joblib
 import matplotlib.pyplot as plt
 from util import get_image_to_tensor_balanced, get_mask_to_tensor
 from scipy.spatial.transform import Rotation as Rot
+# import quaternionic as qn
+
+def asCartesian(rthetaphi):
+    #takes list rthetaphi (single coord)
+    r       = rthetaphi[0]
+    theta   = rthetaphi[1]* np.pi/180 # to radian
+    phi     = rthetaphi[2]* np.pi/180
+    x = r * np.sin( theta ) * np.cos( phi )
+    y = r * np.sin( theta ) * np.sin( phi )
+    z = r * np.cos( theta )
+    return [x,y,z]
+
+def asSpherical(xyz):
+    #takes list xyz (single coord)
+    x       = xyz[0]
+    y       = xyz[1]
+    z       = xyz[2]
+    r       =  np.sqrt(x*x + y*y + z*z)
+    theta   =  np.cos(z/r)*180/ np.pi #to degrees
+    phi     =  np.arctan2(y,x)*180/ np.pi
+    return [r,theta,phi]
 
 def cartesian_to_polar(x, y):
     rho = np.sqrt(x ** 2 + y ** 2)
@@ -194,7 +215,12 @@ class GibsonDataset(torch.utils.data.Dataset):
             # aa[0] += theta_x * 180 / np.pi
             # pose[:3,:3] = torch.tensor(Rot.from_euler('xyz', aa, degrees=True).as_matrix())
             # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
-            pose[:3, 3] = -pose[:3, 3]
+            # q1 = qn.array.from_rotation_matrix(pose[:3,:3]).normalized
+            # theta, phi = q1.to_spherical_coordinates
+            # theta_x = abs(np.arctan2(-all_cam[i][:3, 3][1], np.sqrt(np.sum(np.square(all_cam[i][:3, [0, 2]]))))
+            # q1 = qn.array.from_spherical_coordinates([theta-theta_x, phi])
+            # pose[:3, :3] = q1.to_rotation_matrix
+            pose[:3, 1] = 0.88
             if pose.shape[0] == 3:
                 pose = np.vstack((pose, np.array([0, 0, 0, 1])))
             # P = np.matmul(self.coord_cam, P)
@@ -216,9 +242,9 @@ class GibsonDataset(torch.utils.data.Dataset):
             # pose[:3,:3] = np.matmul(r.as_matrix(), pose[:3,:3])
             # r = Rot.from_euler('y', theta, degrees=True)
             # pose[:3,:3] = np.matmul(r.as_matrix(), pose[:3,:3])
-            # r = Rot.from_matrix(pose[:3, :3])
-            # aa = r.as_euler('xyz', degrees=True)
-            # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
+            r = Rot.from_matrix(pose[:3, :3])
+            aa = r.as_euler('xyz', degrees=True)
+            print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
             img_tensor = self.image_to_tensor(img)
             if mask_path is not None:
                 mask_tensor = self.mask_to_tensor(mask)
@@ -245,29 +271,29 @@ class GibsonDataset(torch.utils.data.Dataset):
         poses[:, 2, -1] = (poses[:, 2, -1] - min(poses[:, 2, -1])) / (max(poses[:, 2, -1]) - min(poses[:, 2, -1]) + 0.0001) * 10.
         origins = poses[:, :3, -1]
 
-        # ax = plt.figure(figsize=(12, 8)).add_subplot(projection='3d')
-        # _ = ax.quiver(
-        #     origins[..., 0].flatten(),
-        #     origins[..., 1].flatten(),
-        #     origins[..., 2].flatten(),
-        #     dirs[..., 0].flatten(),
-        #     dirs[..., 1].flatten(),
-        #     dirs[..., 2].flatten(), length=0.05, normalize=True)
-        # plt.axis("on")
-        # ax.set_xlabel('x')                         # axis label
-        # ax.set_ylabel('y')
-        # ax.set_zlabel('z')
-        # plt.show()
-        #
-        # ax = plt.figure(figsize=(12, 12)).add_subplot()
-        # _ = ax.quiver(
-        #   origins[..., 0].flatten(),
-        #   origins[..., 1].flatten(),
-        #   dirs[..., 0].flatten(),
-        #   dirs[..., 1].flatten(),
-        # )
-        # plt.axis("on")
-        # plt.show()
+        ax = plt.figure(figsize=(12, 8)).add_subplot(projection='3d')
+        _ = ax.quiver(
+            origins[..., 0].flatten(),
+            origins[..., 1].flatten(),
+            origins[..., 2].flatten(),
+            dirs[..., 0].flatten(),
+            dirs[..., 1].flatten(),
+            dirs[..., 2].flatten(), length=0.05, normalize=True)
+        plt.axis("on")
+        ax.set_xlabel('x')                         # axis label
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        plt.show()
+
+        ax = plt.figure(figsize=(12, 12)).add_subplot()
+        _ = ax.quiver(
+          origins[..., 0].flatten(),
+          origins[..., 1].flatten(),
+          dirs[..., 0].flatten(),
+          dirs[..., 1].flatten(),
+        )
+        plt.axis("on")
+        plt.show()
 
         if mask_path is not None:
             all_bboxes = torch.stack(all_bboxes)
