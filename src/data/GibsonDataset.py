@@ -154,14 +154,20 @@ class GibsonDataset(torch.utils.data.Dataset):
         #     pose = all_cam[i]
         #     if pose.shape[0] == 3:
         #         pose = np.vstack((pose, np.array([0, 0, 0, 1])))
+        #     # r = Rot.from_matrix(pose[:3, :3])
+        #     # aa = r.as_euler('xyz', degrees=True)
+        #     # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
         #     pose = (
         #         self._coord_trans_world
         #         @ torch.tensor(pose, dtype=torch.float32)
         #         @ self._coord_trans_cam
         #     )
+        #     r = Rot.from_euler('yz', 90, degrees=True)
+        #     pose[:3,:3] = np.matmul(r.as_matrix(), pose[:3,:3])
         #     r = Rot.from_matrix(pose[:3, :3])
         #     aa = r.as_euler('xyz', degrees=True)
         #     print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
+        #     aa = r.as_euler('y', degrees=True)
 
         for idx, (rgb_path, mask_path) in enumerate(zip(rgb_paths, mask_paths)):
             i = sel_indices[idx]
@@ -196,7 +202,10 @@ class GibsonDataset(torch.utils.data.Dataset):
                 @ torch.tensor(pose, dtype=torch.float32)
                 @ self._coord_trans_cam
             )
-            # pose = torch.tensor(pose, dtype=torch.float32)
+
+            # r = Rot.from_matrix(pose[:3, :3])
+            # aa = r.as_euler('xyz', degrees=True)
+            # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
             img_tensor = self.image_to_tensor(img)
             if mask_path is not None:
                 mask_tensor = self.mask_to_tensor(mask)
