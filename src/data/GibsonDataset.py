@@ -195,34 +195,34 @@ class GibsonDataset(torch.utils.data.Dataset):
             all_imgs.append(img_tensor)
             all_poses.append(pose)
 
-        poses = torch.stack(all_poses).cpu().detach().numpy()
-        dirs = np.stack([np.sum([0, 0, -1] * pose[:3, :3], axis=-1) for pose in poses])
-        poses[:, 2, -1] = (poses[:, 2, -1] - min(poses[:, 2, -1])) / (max(poses[:, 2, -1]) - min(poses[:, 2, -1]) + 0.0001) * 10.
-        origins = poses[:, :3, -1]
+        # poses = torch.stack(all_poses).cpu().detach().numpy()
+        # dirs = np.stack([np.sum([0, 0, -1] * pose[:3, :3], axis=-1) for pose in poses])
+        # poses[:, 2, -1] = (poses[:, 2, -1] - min(poses[:, 2, -1])) / (max(poses[:, 2, -1]) - min(poses[:, 2, -1]) + 0.0001) * 10.
+        # origins = poses[:, :3, -1]
 
-        ax = plt.figure(figsize=(12, 8)).add_subplot(projection='3d')
-        _ = ax.quiver(
-            origins[..., 0].flatten(),
-            origins[..., 1].flatten(),
-            origins[..., 2].flatten(),
-            dirs[..., 0].flatten(),
-            dirs[..., 1].flatten(),
-            dirs[..., 2].flatten(), length=0.05, normalize=True)
-        plt.axis("on")
-        ax.set_xlabel('x')                         # axis label
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        plt.show()
-
-        ax = plt.figure(figsize=(12, 12)).add_subplot()
-        _ = ax.quiver(
-          origins[..., 0].flatten(),
-          origins[..., 1].flatten(),
-          dirs[..., 0].flatten(),
-          dirs[..., 1].flatten(),
-        )
-        plt.axis("on")
-        plt.show()
+        # ax = plt.figure(figsize=(12, 8)).add_subplot(projection='3d')
+        # _ = ax.quiver(
+        #     origins[..., 0].flatten(),
+        #     origins[..., 1].flatten(),
+        #     origins[..., 2].flatten(),
+        #     dirs[..., 0].flatten(),
+        #     dirs[..., 1].flatten(),
+        #     dirs[..., 2].flatten(), length=0.05, normalize=True)
+        # plt.axis("on")
+        # ax.set_xlabel('x')                         # axis label
+        # ax.set_ylabel('y')
+        # ax.set_zlabel('z')
+        # plt.show()
+        #
+        # ax = plt.figure(figsize=(12, 12)).add_subplot()
+        # _ = ax.quiver(
+        #   origins[..., 0].flatten(),
+        #   origins[..., 1].flatten(),
+        #   dirs[..., 0].flatten(),
+        #   dirs[..., 1].flatten(),
+        # )
+        # plt.axis("on")
+        # plt.show()
 
         if mask_path is not None:
             all_bboxes = torch.stack(all_bboxes)
