@@ -5,6 +5,7 @@ import glob
 import imageio
 import numpy as np
 from PIL import Image
+import quaternion as q
 import cv2
 import joblib
 from util import get_image_to_tensor_balanced, get_mask_to_tensor
@@ -25,7 +26,7 @@ class GibsonDataset(torch.utils.data.Dataset):
         sub_format="shapenet",
         scale_focal=True,
         max_imgs=100000,
-        z_near=1.2,
+        z_near=0.5,
         z_far=4.0,
         skip_step=None,
     ):
@@ -83,7 +84,7 @@ class GibsonDataset(torch.utils.data.Dataset):
                 [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]],
                 dtype=torch.float32,
             )
-            self.coord_cam = np.array( [[1, 0, 0], [0, 0, 1], [0, -1, 0]])
+            self.coord_cam = np.array( [[1, 0, 0], [0, 0, 1], [0, 1, 0]])
         self.sub_format = sub_format
         self.scale_focal = scale_focal
         self.max_imgs = max_imgs
@@ -107,6 +108,7 @@ class GibsonDataset(torch.utils.data.Dataset):
             if (x.endswith(".jpg") or x.endswith(".png"))
         ]
         rgb_paths = sorted(rgb_paths)
+        mask_path = None
         mask_paths = []#sorted(glob.glob(os.path.join(root_dir, "mask", "*.png")))
         if len(mask_paths) == 0:
             mask_paths = [None] * len(rgb_paths)
@@ -152,22 +154,27 @@ class GibsonDataset(torch.utils.data.Dataset):
             # P[:3, :3] = np.matmul(self.coord_cam, R)
             # t = P[:3, 3]
             # P[:3, 3] = np.matmul(self.coord_cam, t)
-            K = np.eye(3, dtype=np.float32)
-
-            K, R, t = cv2.decomposeProjectionMatrix(P)[:3]
             # K = np.eye(3, dtype=np.float32)
-            K = K / K[2, 2]
+
+            # print(q.as_euler_angles(q.from_rotation_matrix(P[:3,:3]))[2] * 180 / np.pi)
+            # K, R, t = cv2.decomposeProjectionMatrix(P)[:3]
+            # print(q.as_euler_angles(q.from_rotation_matrix(R))[1] * 180 / np.pi)
+            R = P[:3, :3]
+            t = P[:3, 3]
+            K = np.eye(3, dtype=np.float32)
+            # K = K / K[2, 2]
 
             pose = np.eye(4, dtype=np.float32)
-            pose[:3, :3] = R.transpose()
-            # pose[:3, 3] = t #(t)[:, 0]
-            pose[:3, 3] = (t[:3] / t[3])[:, 0]
+            pose[:3, :3] = R#.transpose()
+            pose[:3, 3] = t #(t)[:, 0]
+            # pose[:3, 3] = (t[:3] / t[3])[:, 0]
             # pose[3, 3] *= 1.0
             fx = torch.tensor(K[0, 0]) * x_scale
             fy = torch.tensor(K[1, 1]) * y_scale
             cx = (torch.tensor(K[0, 2]) + xy_delta) * x_scale
             cy = (torch.tensor(K[1, 2]) + xy_delta) * y_scale
             focal = torch.tensor((fx, fy), dtype=torch.float32)
+            c = torch.tensor((cx, cy), dtype=torch.float32)
 
             # pose = torch.tensor(pose, dtype=torch.float32) @ self._coord_trans
             # pose = (
@@ -210,6 +217,7 @@ class GibsonDataset(torch.utils.data.Dataset):
         if self.image_size is not None and all_imgs.shape[-2:] != self.image_size:
             scale = self.image_size / all_imgs.shape[-2]
             focal *= scale
+            c *= scale
             if mask_path is not None:
                 all_bboxes *= scale
                 all_bboxes = all_bboxes.clamp(0, self.image_size - 1)
@@ -227,4 +235,5 @@ class GibsonDataset(torch.utils.data.Dataset):
         if all_masks is not None:
             result["masks"] = all_masks
             result["bbox"] = all_bboxes
+        result["c"] = c
         return result
