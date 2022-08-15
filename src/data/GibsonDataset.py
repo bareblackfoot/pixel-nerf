@@ -150,25 +150,6 @@ class GibsonDataset(torch.utils.data.Dataset):
         all_masks = []
         all_bboxes = []
         focal = None
-        # for idx, (rgb_path, mask_path) in enumerate(zip(rgb_paths, mask_paths)):
-        #     i = sel_indices[idx]
-        #     pose = all_cam[i]
-        #     if pose.shape[0] == 3:
-        #         pose = np.vstack((pose, np.array([0, 0, 0, 1])))
-        #     # r = Rot.from_matrix(pose[:3, :3])
-        #     # aa = r.as_euler('xyz', degrees=True)
-        #     # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
-        #     pose = (
-        #         self._coord_trans_world
-        #         @ torch.tensor(pose, dtype=torch.float32)
-        #         @ self._coord_trans_cam
-        #     )
-            # r = Rot.from_euler('yz', 90, degrees=True)
-            # pose[:3,:3] = np.matmul(r.as_matrix(), pose[:3,:3])
-            # r = Rot.from_matrix(pose[:3, :3])
-            # aa = r.as_euler('xyz', degrees=True)
-            # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
-            # aa = r.as_euler('y', degrees=True)
 
         for idx, (rgb_path, mask_path) in enumerate(zip(rgb_paths, mask_paths)):
             i = sel_indices[idx]
@@ -188,37 +169,11 @@ class GibsonDataset(torch.utils.data.Dataset):
                 mask = mask[..., :1]
             # Decompose projection matrix
             pose = all_cam[i]
-
-            # r = Rot.from_matrix(pose[:3, :3])
-            # aa = r.as_euler('xyz', degrees=True)
-            # aa[0] += theta_x * 180 / np.pi
-            # pose[:3,:3] = torch.tensor(Rot.from_euler('xyz', aa, degrees=True).as_matrix())
-            # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
-            # pose[:3, 3] = -pose[:3, 3]
-            # if pose.shape[0] == 3:
-            #     pose = np.vstack((pose, np.array([0, 0, 0, 1])))
-            # P = np.matmul(self.coord_cam, P)
             K = np.eye(3, dtype=np.float32)
             fx = torch.tensor(K[0, 0]) * x_scale
             fy = torch.tensor(K[1, 1]) * y_scale
             focal = torch.tensor((fx, fy), dtype=torch.float32)
-
-            # pose = (
-            #     self._coord_trans_world
-            #     @ torch.tensor(pose, dtype=torch.float32)
-            #     @ self._coord_trans_cam
-            # )
             pose = torch.tensor(pose, dtype=torch.float32)
-            # r = Rot.from_matrix(pose[:3, :3])
-            # aa = r.as_euler('xyz')[2]
-            # theta = np.abs(np.arctan2(-all_cam[i][:3, 3][1], np.sqrt(np.sum(np.square(all_cam[i][:3, [0,2]]))))) *180/np.pi*10.
-            # r = Rot.from_euler('x', theta, degrees=True)
-            # pose[:3,:3] = np.matmul(r.as_matrix(), pose[:3,:3])
-            # r = Rot.from_euler('y', theta, degrees=True)
-            # pose[:3,:3] = np.matmul(r.as_matrix(), pose[:3,:3])
-            # r = Rot.from_matrix(pose[:3, :3])
-            # aa = r.as_euler('xyz', degrees=True)
-            # print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
             img_tensor = self.image_to_tensor(img)
             if mask_path is not None:
                 mask_tensor = self.mask_to_tensor(mask)
