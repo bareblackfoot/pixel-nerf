@@ -47,7 +47,7 @@ class GibsonDataset(torch.utils.data.Dataset):
         scale_focal=True,
         max_imgs=100000,
         z_near=0.5,
-        z_far=4.0,
+        z_far=6.0,
         skip_step=None,
     ):
         """
