@@ -9,6 +9,25 @@ import quaternion as q
 import cv2
 import joblib
 from util import get_image_to_tensor_balanced, get_mask_to_tensor
+from scipy.spatial.transform import Rotation as Rot
+
+def cartesian_to_polar(x, y):
+    rho = np.sqrt(x ** 2 + y ** 2)
+    phi = np.arctan2(y, x)
+    return rho, phi
+
+
+def quaternion_rotate_vector(quat: np.quaternion, v: np.array) -> np.array:
+    r"""Rotates a vector by a quaternion
+    Args:
+        quaternion: The quaternion to rotate by
+        v: The vector to rotate
+    Returns:
+        np.array: The rotated vector
+    """
+    vq = np.quaternion(0, 0, 0, 0)
+    vq.imag = v
+    return (quat * vq * quat.inverse()).imag
 
 
 class GibsonDataset(torch.utils.data.Dataset):
@@ -130,6 +149,19 @@ class GibsonDataset(torch.utils.data.Dataset):
         all_masks = []
         all_bboxes = []
         focal = None
+        # for idx, (rgb_path, mask_path) in enumerate(zip(rgb_paths, mask_paths)):
+        #     i = sel_indices[idx]
+        #     pose = all_cam[i]
+        #     if pose.shape[0] == 3:
+        #         pose = np.vstack((pose, np.array([0, 0, 0, 1])))
+        #     pose = (
+        #         self._coord_trans_world
+        #         @ torch.tensor(pose, dtype=torch.float32)
+        #         @ self._coord_trans_cam
+        #     )
+        #     r = Rot.from_matrix(pose[:3, :3])
+        #     aa = r.as_euler('xyz', degrees=True)
+        #     print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
 
         for idx, (rgb_path, mask_path) in enumerate(zip(rgb_paths, mask_paths)):
             i = sel_indices[idx]
@@ -148,41 +180,23 @@ class GibsonDataset(torch.utils.data.Dataset):
                     mask = mask[..., None]
                 mask = mask[..., :1]
             # Decompose projection matrix
-            P = all_cam[i]
-            P = np.matmul(self.coord_cam, P)
-            # R = P[:3, :3]
-            # P[:3, :3] = np.matmul(self.coord_cam, R)
-            # t = P[:3, 3]
-            # P[:3, 3] = np.matmul(self.coord_cam, t)
-            # K = np.eye(3, dtype=np.float32)
-
-            # print(q.as_euler_angles(q.from_rotation_matrix(P[:3,:3]))[2] * 180 / np.pi)
-            # K, R, t = cv2.decomposeProjectionMatrix(P)[:3]
-            # print(q.as_euler_angles(q.from_rotation_matrix(R))[1] * 180 / np.pi)
-            R = P[:3, :3]
-            t = P[:3, 3]
+            pose = all_cam[i]
+            if pose.shape[0] == 3:
+                pose = np.vstack((pose, np.array([0, 0, 0, 1])))
+            # P = np.matmul(self.coord_cam, P)
             K = np.eye(3, dtype=np.float32)
-            # K = K / K[2, 2]
-
-            pose = np.eye(4, dtype=np.float32)
-            pose[:3, :3] = R#.transpose()
-            pose[:3, 3] = t #(t)[:, 0]
-            # pose[:3, 3] = (t[:3] / t[3])[:, 0]
-            # pose[3, 3] *= 1.0
             fx = torch.tensor(K[0, 0]) * x_scale
             fy = torch.tensor(K[1, 1]) * y_scale
-            cx = (torch.tensor(K[0, 2]) + xy_delta) * x_scale
-            cy = (torch.tensor(K[1, 2]) + xy_delta) * y_scale
             focal = torch.tensor((fx, fy), dtype=torch.float32)
-            c = torch.tensor((cx, cy), dtype=torch.float32)
+            # c = torch.tensor((cx, cy), dtype=torch.float32)
 
             # pose = torch.tensor(pose, dtype=torch.float32) @ self._coord_trans
-            # pose = (
-            #     self._coord_trans_world
-            #     @ torch.tensor(pose, dtype=torch.float32)
-            #     @ self._coord_trans_cam
-            # )
-            pose = torch.tensor(pose, dtype=torch.float32)
+            pose = (
+                self._coord_trans_world
+                @ torch.tensor(pose, dtype=torch.float32)
+                @ self._coord_trans_cam
+            )
+            # pose = torch.tensor(pose, dtype=torch.float32)
             img_tensor = self.image_to_tensor(img)
             if mask_path is not None:
                 mask_tensor = self.mask_to_tensor(mask)
@@ -217,7 +231,6 @@ class GibsonDataset(torch.utils.data.Dataset):
         if self.image_size is not None and all_imgs.shape[-2:] != self.image_size:
             scale = self.image_size / all_imgs.shape[-2]
             focal *= scale
-            c *= scale
             if mask_path is not None:
                 all_bboxes *= scale
                 all_bboxes = all_bboxes.clamp(0, self.image_size - 1)
@@ -235,5 +248,4 @@ class GibsonDataset(torch.utils.data.Dataset):
         if all_masks is not None:
             result["masks"] = all_masks
             result["bbox"] = all_bboxes
-        result["c"] = c
         return result

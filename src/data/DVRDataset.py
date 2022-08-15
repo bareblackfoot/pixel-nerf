@@ -6,6 +6,7 @@ import imageio
 import numpy as np
 import cv2
 from util import get_image_to_tensor_balanced, get_mask_to_tensor
+from scipy.spatial.transform import Rotation as Rot
 
 
 class DVRDataset(torch.utils.data.Dataset):
@@ -137,6 +138,38 @@ class DVRDataset(torch.utils.data.Dataset):
         if self.sub_format != "shapenet":
             # Prepare to average intrinsics over images
             fx, fy, cx, cy = 0.0, 0.0, 0.0, 0.0
+
+        for idx, (rgb_path, mask_path) in enumerate(zip(rgb_paths, mask_paths)):
+            i = sel_indices[idx]
+            wmat_inv_key = "world_mat_inv_" + str(i)
+            wmat_key = "world_mat_" + str(i)
+            if wmat_inv_key in all_cam:
+                extr_inv_mtx = all_cam[wmat_inv_key]
+            else:
+                extr_inv_mtx = all_cam[wmat_key]
+                if extr_inv_mtx.shape[0] == 3:
+                    extr_inv_mtx = np.vstack((extr_inv_mtx, np.array([0, 0, 0, 1])))
+                extr_inv_mtx = np.linalg.inv(extr_inv_mtx)
+
+            intr_mtx = all_cam["camera_mat_" + str(i)]
+            fx, fy = intr_mtx[0, 0], intr_mtx[1, 1]
+            assert abs(fx - fy) < 1e-9
+            fx = fx * 1
+            if focal is None:
+                focal = fx
+            else:
+                assert abs(fx - focal) < 1e-5
+            pose = extr_inv_mtx
+
+            pose = (
+                self._coord_trans_world
+                @ torch.tensor(pose, dtype=torch.float32)
+                @ self._coord_trans_cam
+            )
+
+            r = Rot.from_matrix(pose[:3, :3])
+            aa = r.as_euler('xyz', degrees=True)
+            print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
 
         for idx, (rgb_path, mask_path) in enumerate(zip(rgb_paths, mask_paths)):
             i = sel_indices[idx]

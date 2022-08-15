@@ -74,6 +74,7 @@ class SRNDataset(torch.utils.data.Dataset):
             pose = torch.from_numpy(
                 np.loadtxt(pose_path, dtype=np.float32).reshape(4, 4)
             )
+            pose = pose @ self._coord_trans
             r = R.from_matrix(pose[:3, :3])
             aa = r.as_euler('xyz', degrees=True)
             print([int(aa[0]), int(aa[1]), int(aa[2]), pose[:3,3]])
