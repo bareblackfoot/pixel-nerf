@@ -10,6 +10,7 @@ import random
 import cv2
 import joblib
 import matplotlib.pyplot as plt
+import shutil
 from util import get_image_to_tensor_balanced, get_mask_to_tensor
 from scipy.spatial.transform import Rotation as Rot
 
@@ -266,5 +267,8 @@ class GibsonDataset(torch.utils.data.Dataset):
         if all_masks is not None:
             result["masks"] = all_masks
             result["bbox"] = all_bboxes
+        # if len(result['images']) < 20:
+        #     print(result['path'])
+        #     shutil.rmtree(result['path'])
         result = self.sample(result)
         return result
