@@ -6,6 +6,7 @@ import imageio
 import numpy as np
 from PIL import Image
 import quaternion as q
+import random
 import cv2
 import joblib
 import matplotlib.pyplot as plt
@@ -116,6 +117,14 @@ class GibsonDataset(torch.utils.data.Dataset):
         self.z_far = z_far
         self.lindisp = False
 
+    def sample(self, result, sample_size=20):
+        idx = list(range(0, len(result['images'])))
+        random.shuffle(idx)
+        idx = idx[:sample_size]
+        for key, value in result.items():
+            result[key] = value[idx]
+        return result
+
     def __len__(self):
         return len(self.file_lists)
 
@@ -129,7 +138,7 @@ class GibsonDataset(torch.utils.data.Dataset):
         ]
         rgb_paths = sorted(rgb_paths)
         mask_path = None
-        mask_paths = []#sorted(glob.glob(os.path.join(root_dir, "mask", "*.png")))
+        mask_paths = sorted(glob.glob(os.path.join(root_dir, "mask", "*.png")))
         if len(mask_paths) == 0:
             mask_paths = [None] * len(rgb_paths)
 
@@ -188,12 +197,14 @@ class GibsonDataset(torch.utils.data.Dataset):
                     bbox = torch.tensor([cmin, rmin, cmax, rmax], dtype=torch.float32)
                     all_masks.append(mask_tensor)
                     all_bboxes.append(bbox)
-                else:
-                    all_masks.append(self.mask_to_tensor(mask))
-                    all_bboxes.append(torch.tensor([0, 0, 1, 1], dtype=torch.float32))
-
-            all_imgs.append(img_tensor)
-            all_poses.append(pose)
+                    all_imgs.append(img_tensor)
+                    all_poses.append(pose)
+                # else:
+                #     all_masks.append(self.mask_to_tensor(mask))
+                #     all_bboxes.append(torch.tensor([0, 0, 1, 1], dtype=torch.float32))
+            else:
+                all_imgs.append(img_tensor)
+                all_poses.append(pose)
 
         # poses = torch.stack(all_poses).cpu().detach().numpy()
         # dirs = np.stack([np.sum([0, 0, -1] * pose[:3, :3], axis=-1) for pose in poses])
@@ -254,4 +265,5 @@ class GibsonDataset(torch.utils.data.Dataset):
         if all_masks is not None:
             result["masks"] = all_masks
             result["bbox"] = all_bboxes
+        result = self.sample(result)
         return result
