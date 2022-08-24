@@ -239,7 +239,8 @@ class GibsonDataset(torch.utils.data.Dataset):
 
         if mask_path is not None:
             all_bboxes = torch.stack(all_bboxes)
-
+        if len(all_imgs) == 0:
+            print()
         all_imgs = torch.stack(all_imgs)
         all_poses = torch.stack(all_poses)
         if len(all_masks) > 0:
