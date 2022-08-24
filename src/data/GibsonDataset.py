@@ -122,7 +122,8 @@ class GibsonDataset(torch.utils.data.Dataset):
         random.shuffle(idx)
         idx = idx[:sample_size]
         for key, value in result.items():
-            result[key] = value[idx]
+            if key in ['images', 'masks', 'poses', 'bbox']:
+                result[key] = value[idx]
         return result
 
     def __len__(self):
