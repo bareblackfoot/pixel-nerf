@@ -235,6 +235,18 @@ def bbox_sample(bboxes, num_pix, image_size=64):
     return pix
 
 
+def out_bbox_sample(masks, num_pix, image_size=64):
+    """
+    :return (num_pix, 3)
+    """
+    image_ids = torch.randint(0, masks.shape[0], (num_pix,))
+    masks = masks.squeeze()
+    sample_idx = torch.randint(0, masks.shape[0]*masks.shape[1]*masks.shape[1], (num_pix,))
+    out_of_bbox_samples = (1 - masks).nonzero()
+    pix = out_of_bbox_samples[sample_idx]
+    return pix
+
+
 def gen_rays(poses, width, height, focal, z_near, z_far, c=None, ndc=False):
     """
     Generate camera rays

@@ -129,6 +129,7 @@ class PixelNeRFTrainer(trainlib.Trainer):
         all_bboxes = data.get("bbox")  # (SB, NV, 4)  cmin rmin cmax rmax
         all_focals = data["focal"]  # (SB)
         all_c = data.get("c")  # (SB)
+        all_masks = data["masks"].to(device=device)  # (SB, NV, H, W)
 
         if self.use_bbox and global_step >= args.no_bbox_step:
             self.use_bbox = False
@@ -148,6 +149,7 @@ class PixelNeRFTrainer(trainlib.Trainer):
         for obj_idx in range(SB):
             if all_bboxes is not None:
                 bboxes = all_bboxes[obj_idx]
+                masks = all_masks[obj_idx]
             images = all_images[obj_idx]  # (NV, 3, H, W)
             poses = all_poses[obj_idx]  # (NV, 4, 4)
             focal = all_focals[obj_idx]
@@ -170,15 +172,24 @@ class PixelNeRFTrainer(trainlib.Trainer):
             )  # (NV, H, W, 3)
 
             if all_bboxes is not None:
-                pix = util.bbox_sample(bboxes, args.ray_batch_size)
-                pix_inds = pix[..., 0] * H * W + pix[..., 1] * W + pix[..., 2]
+                obj_pix = util.bbox_sample(bboxes, args.ray_batch_size//2)
+                obj_pix_inds = obj_pix[..., 0] * H * W + obj_pix[..., 1] * W + obj_pix[..., 2]
+                bg_pix = util.out_bbox_sample(masks, args.ray_batch_size//2)
+                bg_pix_inds = bg_pix[..., 0] * H * W + bg_pix[..., 1] * W + bg_pix[..., 2]
             else:
-                pix_inds = torch.randint(0, NV * H * W, (args.ray_batch_size,))
+                obj_pix_inds = torch.randint(0, NV * H * W, (args.ray_batch_size//2,))
+                bg_pix_inds = torch.randint(0, NV * H * W, (args.ray_batch_size//2,))
 
-            rgb_gt = rgb_gt_all[pix_inds]  # (ray_batch_size, 3)
-            rays = cam_rays.view(-1, cam_rays.shape[-1])[pix_inds].to(
+            obj_rgb_gt = rgb_gt_all[obj_pix_inds]  # (ray_batch_size, 3)
+            bg_rgb_gt = rgb_gt_all[bg_pix_inds]
+            rgb_gt = torch.cat((obj_rgb_gt, bg_rgb_gt), -1)
+            obj_rays = cam_rays.view(-1, cam_rays.shape[-1])[obj_pix_inds].to(
                 device=device
             )  # (ray_batch_size, 8)
+            bg_rays = cam_rays.view(-1, cam_rays.shape[-1])[bg_pix_inds].to(
+                device=device
+            )  # (ray_batch_size, 8)
+            rays = torch.cat((obj_rays, bg_rays), -1)
 
             all_rgb_gt.append(rgb_gt)
             all_rays.append(rays)

@@ -1,4 +1,6 @@
 import os.path
+import pdb
+
 import torch
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
@@ -161,6 +163,10 @@ class Trainer:
                 for data in self.train_data_loader:
                     losses = self.train_step(data, global_step=step_id)
                     loss_str = fmt_loss_str(losses)
+                    if np.isnan(losses['rc']) | np.isnan(losses['rf']):
+                        print("aa")
+                        pdb.set_trace()
+                        print("bb")
                     if batch % self.print_interval == 0:
                         print(
                             "E",

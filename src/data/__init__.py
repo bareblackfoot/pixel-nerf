@@ -26,6 +26,8 @@ def get_split_dataset(dataset_type, datadir, image_size, want_split="all", train
         # For ShapeNet single-category (from SRN)
         dset_class = GibsonDataset
         flags["image_size"] = image_size
+        flags["z_near"] = 0.1
+        flags["z_far"] = 5.0
     elif dataset_type == "multi_obj":
         # For multiple-object
         dset_class = MultiObjectDataset

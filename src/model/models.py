@@ -68,8 +68,12 @@ class PixelNeRFNet(torch.nn.Module):
         d_out = 4
 
         self.latent_size = self.encoder.latent_size
-        self.mlp_coarse = make_mlp(conf["mlp_coarse"], d_in, d_latent, d_out=d_out)
-        self.mlp_fine = make_mlp(
+        self.obj_mlp_coarse = make_mlp(conf["mlp_coarse"], d_in, d_latent, d_out=d_out)
+        self.obj_mlp_fine = make_mlp(
+            conf["mlp_fine"], d_in, d_latent, d_out=d_out, allow_empty=True
+        )
+        self.bg_mlp_coarse = make_mlp(conf["mlp_coarse"], d_in, d_latent, d_out=d_out)
+        self.bg_mlp_fine = make_mlp(
             conf["mlp_fine"], d_in, d_latent, d_out=d_out, allow_empty=True
         )
         # Note: this is world -> camera, and bottom row is omitted
@@ -239,26 +243,49 @@ class PixelNeRFNet(torch.nn.Module):
             dim_size = None
 
             # Run main NeRF network
-            if coarse or self.mlp_fine is None:
-                mlp_output = self.mlp_coarse(
+            if coarse or self.obj_mlp_fine is None:
+                obj_mlp_output = self.obj_mlp_coarse(
+                    mlp_input,
+                    combine_inner_dims=(self.num_views_per_obj, B),
+                    combine_index=combine_index,
+                    dim_size=dim_size,
+                )
+                bg_mlp_output = self.bg_mlp_coarse(
                     mlp_input,
                     combine_inner_dims=(self.num_views_per_obj, B),
                     combine_index=combine_index,
                     dim_size=dim_size,
                 )
             else:
-                mlp_output = self.mlp_fine(
+                obj_mlp_output = self.obj_mlp_fine(
                     mlp_input,
                     combine_inner_dims=(self.num_views_per_obj, B),
                     combine_index=combine_index,
                     dim_size=dim_size,
                 )
+                bg_mlp_output = self.bg_mlp_fine(
+                    mlp_input,
+                    combine_inner_dims=(self.num_views_per_obj, B),
+                    combine_index=combine_index,
+                    dim_size=dim_size,
+                )
+            # Composite
 
             # Interpret the output
-            mlp_output = mlp_output.reshape(-1, B, self.d_out)
+            obj_mlp_output = obj_mlp_output.reshape(-1, B, self.d_out)
+            bg_mlp_output = bg_mlp_output.reshape(-1, B, self.d_out)
 
-            rgb = mlp_output[..., :3]
-            sigma = mlp_output[..., 3:4]
+            obj_rgb = obj_mlp_output[..., :3]
+            obj_sigma = obj_mlp_output[..., 3:4]
+            bg_rgb = bg_mlp_output[..., :3]
+            bg_sigma = bg_mlp_output[..., 3:4]
+
+            denom_sigma = obj_sigma + bg_sigma
+            denom_sigma[denom_sigma == 0] = 1e-4
+            w_obj_sigma = obj_sigma / denom_sigma
+            w_bg_sigma = bg_sigma / denom_sigma
+            sigma = obj_sigma + bg_sigma
+            rgb = obj_rgb * w_obj_sigma + bg_rgb * w_bg_sigma
 
             output_list = [torch.sigmoid(rgb), torch.relu(sigma)]
             output = torch.cat(output_list, dim=-1)
