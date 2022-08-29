@@ -162,9 +162,25 @@ class PixelNeRFTrainer(trainlib.Trainer):
                     np.random.choice(NV, curr_nviews, replace=False)
                 )
             images_0to1 = images * 0.5 + 0.5
+            _coord_trans_world = np.array(
+                [[1, 0, 0, 0], [0, 0, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]],
+                dtype=np.float32,
+            )
+            _coord_trans_cam = np.array(
+                [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]],
+                dtype=np.float32,
+            )
+            aa = (
+                _coord_trans_world
+                @ np.eye(poses.shape[1])
+                @ _coord_trans_cam
+            )
+            aa[:, 0] = -aa[:, 0]
+            aa[:, 2] = -aa[:, 2]
+            aa = torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device)
 
             obj_rays = util.gen_rays(
-                torch.eye(poses.shape[1]).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device), W, H, focal, self.z_near, self.z_far, c=c
+                torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device), W, H, focal, self.z_near, self.z_far, c=c
             )  # (NV, H, W, 8)
             bg_rays = util.gen_rays(
                 poses, W, H, focal, self.z_near, self.z_far, c=c
