@@ -177,7 +177,7 @@ class PixelNeRFTrainer(trainlib.Trainer):
             )
             aa[:, 0] = -aa[:, 0]
             aa[:, 2] = -aa[:, 2]
-            aa = torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device)
+            aa = torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device).float()
 
             obj_rays = util.gen_rays(
                 aa, W, H, focal, self.z_near, self.z_far, c=c
