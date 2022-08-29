@@ -180,7 +180,7 @@ class PixelNeRFTrainer(trainlib.Trainer):
             aa = torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device)
 
             obj_rays = util.gen_rays(
-                torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device), W, H, focal, self.z_near, self.z_far, c=c
+                aa, W, H, focal, self.z_near, self.z_far, c=c
             )  # (NV, H, W, 8)
             bg_rays = util.gen_rays(
                 poses, W, H, focal, self.z_near, self.z_far, c=c
