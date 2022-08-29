@@ -163,7 +163,10 @@ class PixelNeRFTrainer(trainlib.Trainer):
                 )
             images_0to1 = images * 0.5 + 0.5
 
-            cam_rays = util.gen_rays(
+            obj_rays = util.gen_rays(
+                torch.eye(poses.shape[1]).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device), W, H, focal, self.z_near, self.z_far, c=c
+            )  # (NV, H, W, 8)
+            bg_rays = util.gen_rays(
                 poses, W, H, focal, self.z_near, self.z_far, c=c
             )  # (NV, H, W, 8)
             rgb_gt_all = images_0to1
@@ -183,10 +186,10 @@ class PixelNeRFTrainer(trainlib.Trainer):
             obj_rgb_gt = rgb_gt_all[obj_pix_inds]  # (ray_batch_size, 3)
             bg_rgb_gt = rgb_gt_all[bg_pix_inds]
             rgb_gt = torch.cat((obj_rgb_gt, bg_rgb_gt))
-            obj_rays = cam_rays.view(-1, cam_rays.shape[-1])[obj_pix_inds].to(
+            obj_rays = obj_rays.view(-1, obj_rays.shape[-1])[obj_pix_inds].to(
                 device=device
             )  # (ray_batch_size, 8)
-            bg_rays = cam_rays.view(-1, cam_rays.shape[-1])[bg_pix_inds].to(
+            bg_rays = bg_rays.view(-1, bg_rays.shape[-1])[bg_pix_inds].to(
                 device=device
             )  # (ray_batch_size, 8)
             rays = torch.cat((obj_rays, bg_rays))
