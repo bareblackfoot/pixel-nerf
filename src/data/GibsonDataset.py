@@ -123,7 +123,7 @@ class GibsonDataset(torch.utils.data.Dataset):
         random.shuffle(idx)
         idx = idx[:sample_size]
         for key, value in result.items():
-            if key in ['images', 'masks', 'poses', 'bbox']:
+            if key in ['images', 'masks', 'all_obj_pose', 'all_cam_pose', 'bbox']:
                 result[key] = value[idx]
         return result
 
@@ -151,13 +151,23 @@ class GibsonDataset(torch.utils.data.Dataset):
             rgb_paths = [rgb_paths[i] for i in sel_indices]
             mask_paths = [mask_paths[i] for i in sel_indices]
 
-        all_cam = []
-        cam_paths = sorted(glob.glob(os.path.join(root_dir, "pose", "*.pkl")))
-        for cam_path in cam_paths:
-            all_cam.append(joblib.load(cam_path))
+        rel_pose = []
+        rel_paths = sorted(glob.glob(os.path.join(root_dir, "pose", "*.pkl")))
+        for path in rel_paths:
+            rel_pose.append(joblib.load(path))
+        cam_pose = []
+        cam_paths = sorted(glob.glob(os.path.join(root_dir, "cam_pose", "*.pkl")))
+        for path in cam_paths:
+            cam_pose.append(joblib.load(path))
+
+        obj_pose = []
+        obj_paths = sorted(glob.glob(os.path.join(root_dir, "obj_pose", "*.pkl")))
+        for path in obj_paths:
+            obj_pose.append(joblib.load(path))
 
         all_imgs = []
-        all_poses = []
+        all_cam_pose = []
+        all_obj_pose = []
         all_masks = []
         all_bboxes = []
         focal = None
@@ -179,12 +189,24 @@ class GibsonDataset(torch.utils.data.Dataset):
                     mask = mask[..., None]
                 mask = mask[..., :1]
             # Decompose projection matrix
-            pose = all_cam[i]
+            cam_pose_i = cam_pose[i]
+            obj_pose_i = obj_pose[i]
             K = np.eye(3, dtype=np.float32)
             fx = torch.tensor(K[0, 0]) * x_scale
             fy = torch.tensor(K[1, 1]) * y_scale
             focal = torch.tensor((fx, fy), dtype=torch.float32)
-            pose = torch.tensor(pose, dtype=torch.float32)
+            cam_pose_i = (
+                self._coord_trans_world
+                @ torch.tensor(cam_pose_i, dtype=torch.float32)
+                @ self._coord_trans_cam
+            )
+
+            obj_pose_i = (
+                self._coord_trans_world
+                @ torch.tensor(obj_pose_i, dtype=torch.float32)
+                @ self._coord_trans_cam
+            )
+
             img_tensor = self.image_to_tensor(img)
             if mask_path is not None:
                 mask_tensor = self.mask_to_tensor(mask)
@@ -200,13 +222,15 @@ class GibsonDataset(torch.utils.data.Dataset):
                     all_masks.append(mask_tensor)
                     all_bboxes.append(bbox)
                     all_imgs.append(img_tensor)
-                    all_poses.append(pose)
+                    all_cam_pose.append(cam_pose_i)
+                    all_obj_pose.append(obj_pose_i)
                 # else:
                 #     all_masks.append(self.mask_to_tensor(mask))
                 #     all_bboxes.append(torch.tensor([0, 0, 1, 1], dtype=torch.float32))
             else:
                 all_imgs.append(img_tensor)
-                all_poses.append(pose)
+                all_cam_pose.append(cam_pose_i)
+                all_obj_pose.append(obj_pose_i)
 
         # poses = torch.stack(all_poses).cpu().detach().numpy()
         # dirs = np.stack([np.sum([0, 0, -1] * pose[:3, :3], axis=-1) for pose in poses])
@@ -242,7 +266,8 @@ class GibsonDataset(torch.utils.data.Dataset):
         if len(all_imgs) == 0:
             print()
         all_imgs = torch.stack(all_imgs)
-        all_poses = torch.stack(all_poses)
+        all_cam_pose = torch.stack(all_cam_pose)
+        all_obj_pose = torch.stack(all_obj_pose)
         if len(all_masks) > 0:
             all_masks = torch.stack(all_masks)
         else:
@@ -263,7 +288,8 @@ class GibsonDataset(torch.utils.data.Dataset):
             "img_id": index,
             "focal": focal,
             "images": all_imgs,
-            "poses": all_poses,
+            "all_obj_pose": all_obj_pose,
+            "all_cam_pose": all_cam_pose,
         }
         if all_masks is not None:
             result["masks"] = all_masks

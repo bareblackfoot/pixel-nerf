@@ -125,7 +125,8 @@ class PixelNeRFTrainer(trainlib.Trainer):
         all_images = data["images"].to(device=device)  # (SB, NV, 3, H, W)
 
         SB, NV, _, H, W = all_images.shape
-        all_poses = data["poses"].to(device=device)  # (SB, NV, 4, 4)
+        all_cam_poses = data["all_cam_pose"].to(device=device)  # (SB, NV, 4, 4)
+        all_obj_poses = data["all_obj_pose"].to(device=device)  # (SB, NV, 4, 4)
         all_bboxes = data.get("bbox")  # (SB, NV, 4)  cmin rmin cmax rmax
         all_focals = data["focal"]  # (SB)
         all_c = data.get("c")  # (SB)
@@ -151,7 +152,8 @@ class PixelNeRFTrainer(trainlib.Trainer):
                 bboxes = all_bboxes[obj_idx]
                 masks = all_masks[obj_idx]
             images = all_images[obj_idx]  # (NV, 3, H, W)
-            poses = all_poses[obj_idx]  # (NV, 4, 4)
+            cam_poses = all_cam_poses[obj_idx]  # (NV, 4, 4)
+            obj_poses = all_obj_poses[obj_idx]  # (NV, 4, 4)
             focal = all_focals[obj_idx]
             c = None
             if "c" in data:
@@ -170,20 +172,20 @@ class PixelNeRFTrainer(trainlib.Trainer):
                 [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]],
                 dtype=np.float32,
             )
-            aa = (
-                _coord_trans_world
-                @ np.eye(poses.shape[1])
-                @ _coord_trans_cam
-            )
-            aa[:, 0] = -aa[:, 0]
-            aa[:, 2] = -aa[:, 2]
-            aa = torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device).float()
+            # aa = (
+            #     _coord_trans_world
+            #     @ np.eye(poses.shape[1])
+            #     @ _coord_trans_cam
+            # )
+            # aa[:, 0] = -aa[:, 0]
+            # aa[:, 2] = -aa[:, 2]
+            # aa = torch.from_numpy(aa).unsqueeze(0).repeat(poses.shape[0], 1, 1).to(poses.device).float()
 
             obj_rays = util.gen_rays(
-                aa, W, H, focal, self.z_near, self.z_far, c=c
+                obj_poses, W, H, focal, self.z_near, self.z_far, c=c
             )  # (NV, H, W, 8)
             bg_rays = util.gen_rays(
-                poses, W, H, focal, self.z_near, self.z_far, c=c
+                cam_poses, W, H, focal, self.z_near, self.z_far, c=c
             )  # (NV, H, W, 8)
             rgb_gt_all = images_0to1
             rgb_gt_all = (
