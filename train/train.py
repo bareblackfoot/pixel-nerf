@@ -222,7 +222,7 @@ class PixelNeRFTrainer(trainlib.Trainer):
         src_images = util.batched_index_select_nd(
             all_images, image_ord
         )  # (SB, NS, 3, H, W)
-        src_poses = util.batched_index_select_nd(all_poses, image_ord)  # (SB, NS, 4, 4)
+        src_poses = util.batched_index_select_nd(all_cam_poses, image_ord)  # (SB, NS, 4, 4)
 
         all_bboxes = all_poses = all_images = None
 
@@ -272,7 +272,7 @@ class PixelNeRFTrainer(trainlib.Trainer):
             print(idx)
             batch_idx = idx
         images = data["images"][batch_idx].to(device=device)  # (NV, 3, H, W)
-        poses = data["poses"][batch_idx].to(device=device)  # (NV, 4, 4)
+        poses = data["all_cam_pose"][batch_idx].to(device=device)  # (NV, 4, 4)
         focal = data["focal"][batch_idx : batch_idx + 1]  # (1)
         c = data.get("c")
         if c is not None:
